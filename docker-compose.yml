@@ -1,0 +1,60 @@
+services:
+  traefik:
+    image: traefik:v2.10
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"  # Dashboard solo accesible localmente
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - "traefik.http.routers.traefik.rule=Host(`localhost`) && Path(`/dashboard`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.middlewares.strip-dashboard.stripPrefix.prefixes=/dashboard"
+      - "traefik.http.routers.traefik.middlewares=strip-dashboard"
+
+  registro-app:
+    build:
+      context: ./registro-app
+    labels:
+      - "traefik.http.routers.registro.rule=Host(`localhost`) && Path(`/registro`)"
+      - "traefik.http.routers.registro.entrypoints=web"
+      - "traefik.http.routers.registro.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=casila:$2y$10$D5NNu.mAuYabAkTnmKfR1.9vClhpgmlCcZZX6Exf2hjTP2oR/rBhG"
+      - "traefik.http.services.registro.loadbalancer.server.port=5000"
+
+  cliente-uno:
+    build:
+      context: ./cliente-app
+    environment:
+      - SERVICE_ID= Cliente 1
+    labels:
+      - "traefik.http.routers.uno.rule=Host(`localhost`) && Path(`/cliente/uno`)"
+      - "traefik.http.middlewares.strip-uno.stripPrefix.prefixes=/cliente/uno"
+      - "traefik.http.routers.uno.middlewares=strip-uno"
+      - "traefik.http.services.uno.loadbalancer.server.port=5000"
+
+  cliente-app2:
+    build:
+      context: ./cliente-app
+    environment:
+      - SERVICE_ID=Cliente 2
+    labels:
+      - "traefik.http.routers.app2.rule=Host(`localhost`) && Path(`/cliente/dos`)"
+      - "traefik.http.middlewares.strip-app2.stripPrefix.prefixes=/cliente/app2"
+      - "traefik.http.routers.app2.middlewares=strip-app2"
+      - "traefik.http.services.app2.loadbalancer.server.port=5000"
+  monitor:
+    build:
+      context: ./analitica
+    labels:
+      - "traefik.http.routers.monitor.rule=Host(`localhost`) && Path(`/reporte`)"
+      - "traefik.http.routers.monitor.entrypoints=web"
+      - "traefik.http.middlewares.strip-monitor.stripPrefix.prefixes=/reporte"
+      - "traefik.http.middlewares.auth.basicauth.users=casila:$2y$10$D5NNu.mAuYabAkTnmKfR1.9vClhpgmlCcZZX6Exf2hjTP2oR/rBhG"
+
+      - "traefik.http.routers.monitor.middlewares=strip-monitor"
+      - "traefik.http.services.monitor.loadbalancer.server.port=80"
